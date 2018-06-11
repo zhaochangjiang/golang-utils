@@ -1,14 +1,17 @@
 package utils
 
+import (
+	"sort"
+)
+
 //MapMerge 合并两个Map
 func MapMerge(a *map[string]interface{}, b *map[string]interface{}) *map[string]interface{} {
 	for k, v := range *b {
-		aValue := *a
 
 		//判断a和b是否有相同的key
-		if MapKeyIsSet(k, aValue) {
-			if true == MapIsMapStringInterface(v) && true == MapIsMapStringInterface(aValue[k]) {
-				aVal := aValue[k].(map[string]interface{})
+		if MapKeyIsSet(k, a) {
+			if true == MapIsMapStringInterface(v) && true == MapIsMapStringInterface((*a)[k]) {
+				aVal := (*a)[k].(map[string]interface{})
 				bVal := v.(map[string]interface{})
 				MapMerge(&aVal, &bVal)
 			} else {
@@ -31,11 +34,40 @@ func MapIsMapStringInterface(mapContent interface{}) bool {
 }
 
 //MapKeyIsSet 判断map 是否存在key
-func MapKeyIsSet(key string, mapPointer interface{}) bool {
+func MapKeyIsSet(key string, mapValues *map[string]interface{}) bool {
 	flag := false
-	mapValues := mapPointer.(map[string]interface{})
-	if _, ok := mapValues[key]; ok {
+	if _, ok := (*mapValues)[key]; ok {
 		flag = true
 	}
 	return flag
+}
+
+//MapSortByKeyString map按照键排序
+func MapSortByKeyString(mapPointer *map[string]interface{}) *map[string]interface{} {
+
+	var keys []string
+	for k := range *mapPointer {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	res := make(map[string]interface{})
+	for _, k := range keys {
+		res[k] = (*mapPointer)[k]
+	}
+	return &res
+}
+
+//MapSortByKeyInt map按照键排序
+func MapSortByKeyInt(mapPointer *map[int]interface{}) *map[int]interface{} {
+
+	var keys []int
+	for k := range *mapPointer {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	res := make(map[int]interface{})
+	for _, k := range keys {
+		res[k] = (*mapPointer)[k]
+	}
+	return &res
 }

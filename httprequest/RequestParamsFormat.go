@@ -12,13 +12,15 @@ import (
 //RequestParamsFormat 公共参数解析
 type RequestParamsFormat struct {
 	httpRequestContent *http.Request
-	requestParams      *map[string]interface{}
+	RequestParams      *map[string]interface{}
+	PostParams         *map[string]interface{}
+	GetParams          *map[string]interface{}
 }
 
 //Run 初始化导出服务
 func (ea *RequestParamsFormat) Run(r *http.Request) *map[string]interface{} {
 	ea.initParams(r)
-	return ea.requestParams
+	return ea.RequestParams
 }
 
 //InitParams
@@ -97,19 +99,18 @@ func (ea *RequestParamsFormat) orgDataFormat(m int, list []string, v []string, r
 
 //ParamsOrganization
 func (ea *RequestParamsFormat) paramsOrganization() {
-	var paramContent = make(map[string]interface{})
 	var c = ea.httpRequestContent
 	if nil != c.Form {
 		for k, v := range c.Form {
 			params := ea.paramsMaps(k, v)
-			paramContent = *(utils.MapMerge(&paramContent, params))
+			*ea.GetParams = *(utils.MapMerge(ea.GetParams, params))
 		}
 	}
 	if nil != c.PostForm {
 		for k, v := range c.PostForm {
 			params := ea.paramsMaps(k, v)
-			paramContent = *(utils.MapMerge(&paramContent, params))
+			*ea.PostParams = *(utils.MapMerge(ea.PostParams, params))
 		}
 	}
-	ea.requestParams = &paramContent
+	ea.RequestParams = utils.MapMerge(ea.GetParams, ea.PostParams)
 }
