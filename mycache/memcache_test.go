@@ -12,23 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package redis
+package mycache
 
 import (
+	_ "github.com/bradfitz/gomemcache/memcache"
+
+	"strconv"
 	"testing"
 	"time"
-
-	"github.com/astaxie/beego/cache"
-	"github.com/garyburd/redigo/redis"
 )
 
-func TestRedisCache(t *testing.T) {
-	bm, err := cache.NewCache("redis", `{"conn": "127.0.0.1:6379"}`)
+func TestMemcacheCache(t *testing.T) {
+	bm, err := NewCache("memcache", `{"conn": "127.0.0.1:11211"}`)
 	if err != nil {
 		t.Error("init err")
 	}
 	timeoutDuration := 10 * time.Second
-	if err = bm.Put("astaxie", 1, timeoutDuration); err != nil {
+	if err = bm.Put("astaxie", "1", timeoutDuration); err != nil {
 		t.Error("set Error", err)
 	}
 	if !bm.IsExist("astaxie") {
@@ -40,11 +40,11 @@ func TestRedisCache(t *testing.T) {
 	if bm.IsExist("astaxie") {
 		t.Error("check err")
 	}
-	if err = bm.Put("astaxie", 1, timeoutDuration); err != nil {
+	if err = bm.Put("astaxie", "1", timeoutDuration); err != nil {
 		t.Error("set Error", err)
 	}
 
-	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 1 {
+	if v, err := strconv.Atoi(string(bm.Get("astaxie").([]byte))); err != nil || v != 1 {
 		t.Error("get err")
 	}
 
@@ -52,7 +52,7 @@ func TestRedisCache(t *testing.T) {
 		t.Error("Incr Error", err)
 	}
 
-	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 2 {
+	if v, err := strconv.Atoi(string(bm.Get("astaxie").([]byte))); err != nil || v != 2 {
 		t.Error("get err")
 	}
 
@@ -60,7 +60,7 @@ func TestRedisCache(t *testing.T) {
 		t.Error("Decr Error", err)
 	}
 
-	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 1 {
+	if v, err := strconv.Atoi(string(bm.Get("astaxie").([]byte))); err != nil || v != 1 {
 		t.Error("get err")
 	}
 	bm.Delete("astaxie")
@@ -76,7 +76,7 @@ func TestRedisCache(t *testing.T) {
 		t.Error("check err")
 	}
 
-	if v, _ := redis.String(bm.Get("astaxie"), err); v != "author" {
+	if v := bm.Get("astaxie").([]byte); string(v) != "author" {
 		t.Error("get err")
 	}
 
@@ -92,10 +92,10 @@ func TestRedisCache(t *testing.T) {
 	if len(vv) != 2 {
 		t.Error("GetMulti ERROR")
 	}
-	if v, _ := redis.String(vv[0], nil); v != "author" {
+	if string(vv[0].([]byte)) != "author" && string(vv[0].([]byte)) != "author1" {
 		t.Error("GetMulti ERROR")
 	}
-	if v, _ := redis.String(vv[1], nil); v != "author1" {
+	if string(vv[1].([]byte)) != "author1" && string(vv[1].([]byte)) != "author" {
 		t.Error("GetMulti ERROR")
 	}
 

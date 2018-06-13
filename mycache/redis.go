@@ -27,7 +27,7 @@
 //  bm, err := cache.NewCache("redis", `{"conn":"127.0.0.1:11211"}`)
 //
 //  more docs http://beego.me/docs/module/cache.md
-package redis
+package mycache
 
 import (
 	"encoding/json"
@@ -36,8 +36,6 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-
-	"github.com/astaxie/beego/cache"
 )
 
 var (
@@ -45,8 +43,8 @@ var (
 	DefaultKey = "beecacheRedis"
 )
 
-// Cache is Redis cache adapter.
-type Cache struct {
+// RedisCache is Redis cache adapter.
+type RedisCache struct {
 	p        *redis.Pool // redis connection pool
 	conninfo string
 	dbNum    int
@@ -55,12 +53,12 @@ type Cache struct {
 }
 
 // NewRedisCache create new redis cache with default collection name.
-func NewRedisCache() cache.Cache {
-	return &Cache{key: DefaultKey}
+func NewRedisCache() Cache {
+	return &RedisCache{key: DefaultKey}
 }
 
 // actually do the redis cmds
-func (rc *Cache) do(commandName string, args ...interface{}) (reply interface{}, err error) {
+func (rc *RedisCache) do(commandName string, args ...interface{}) (reply interface{}, err error) {
 	c := rc.p.Get()
 	defer c.Close()
 
@@ -68,7 +66,7 @@ func (rc *Cache) do(commandName string, args ...interface{}) (reply interface{},
 }
 
 // Get cache from redis.
-func (rc *Cache) Get(key string) interface{} {
+func (rc *RedisCache) Get(key string) interface{} {
 	if v, err := rc.do("GET", key); err == nil {
 		return v
 	}
@@ -76,7 +74,7 @@ func (rc *Cache) Get(key string) interface{} {
 }
 
 // GetMulti get cache from redis.
-func (rc *Cache) GetMulti(keys []string) []interface{} {
+func (rc *RedisCache) GetMulti(keys []string) []interface{} {
 	size := len(keys)
 	var rv []interface{}
 	c := rc.p.Get()
@@ -109,7 +107,7 @@ ERROR:
 }
 
 // Put put cache to redis.
-func (rc *Cache) Put(key string, val interface{}, timeout time.Duration) error {
+func (rc *RedisCache) Put(key string, val interface{}, timeout time.Duration) error {
 	var err error
 	if _, err = rc.do("SETEX", key, int64(timeout/time.Second), val); err != nil {
 		return err
@@ -122,7 +120,7 @@ func (rc *Cache) Put(key string, val interface{}, timeout time.Duration) error {
 }
 
 // Delete delete cache in redis.
-func (rc *Cache) Delete(key string) error {
+func (rc *RedisCache) Delete(key string) error {
 	var err error
 	if _, err = rc.do("DEL", key); err != nil {
 		return err
@@ -132,7 +130,7 @@ func (rc *Cache) Delete(key string) error {
 }
 
 // IsExist check cache's existence in redis.
-func (rc *Cache) IsExist(key string) bool {
+func (rc *RedisCache) IsExist(key string) bool {
 	v, err := redis.Bool(rc.do("EXISTS", key))
 	if err != nil {
 		return false
@@ -146,19 +144,19 @@ func (rc *Cache) IsExist(key string) bool {
 }
 
 // Incr increase counter in redis.
-func (rc *Cache) Incr(key string) error {
+func (rc *RedisCache) Incr(key string) error {
 	_, err := redis.Bool(rc.do("INCRBY", key, 1))
 	return err
 }
 
 // Decr decrease counter in redis.
-func (rc *Cache) Decr(key string) error {
+func (rc *RedisCache) Decr(key string) error {
 	_, err := redis.Bool(rc.do("INCRBY", key, -1))
 	return err
 }
 
 // ClearAll clean all cache in redis. delete this redis collection.
-func (rc *Cache) ClearAll() error {
+func (rc *RedisCache) ClearAll() error {
 	cachedKeys, err := redis.Strings(rc.do("HKEYS", rc.key))
 	if err != nil {
 		return err
@@ -176,7 +174,7 @@ func (rc *Cache) ClearAll() error {
 // config is like {"key":"collection key","conn":"connection info","dbNum":"0"}
 // the cache item in redis are stored forever,
 // so no gc operation.
-func (rc *Cache) StartAndGC(config string) error {
+func (rc *RedisCache) StartAndGC(config string) error {
 	var cf map[string]string
 	json.Unmarshal([]byte(config), &cf)
 
@@ -206,7 +204,7 @@ func (rc *Cache) StartAndGC(config string) error {
 }
 
 // connect to redis.
-func (rc *Cache) connectInit() {
+func (rc *RedisCache) connectInit() {
 	dialFunc := func() (c redis.Conn, err error) {
 		c, err = redis.Dial("tcp", rc.conninfo)
 		if err != nil {
@@ -236,5 +234,5 @@ func (rc *Cache) connectInit() {
 }
 
 func init() {
-	cache.Register("redis", NewRedisCache)
+	Register("redis", NewRedisCache)
 }

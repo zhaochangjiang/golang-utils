@@ -1,4 +1,4 @@
-package ssdb
+package mycache
 
 import (
 	"strconv"

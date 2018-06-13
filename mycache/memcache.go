@@ -27,7 +27,7 @@
 //  bm, err := cache.NewCache("memcache", `{"conn":"127.0.0.1:11211"}`)
 //
 //  more docs http://beego.me/docs/module/cache.md
-package memcache
+package mycache
 
 import (
 	"encoding/json"
@@ -35,23 +35,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astaxie/beego/cache"
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
-// Cache Memcache adapter.
-type Cache struct {
+// CacheMemcache Memcache adapter.
+type CacheMemcache struct {
 	conn     *memcache.Client
 	conninfo []string
 }
 
 // NewMemCache create new memcache adapter.
-func NewMemCache() cache.Cache {
-	return &Cache{}
+func NewMemCache() Cache {
+	return &CacheMemcache{}
 }
 
 // Get get value from memcache.
-func (rc *Cache) Get(key string) interface{} {
+func (rc *CacheMemcache) Get(key string) interface{} {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -64,7 +63,7 @@ func (rc *Cache) Get(key string) interface{} {
 }
 
 // GetMulti get value from memcache.
-func (rc *Cache) GetMulti(keys []string) []interface{} {
+func (rc *CacheMemcache) GetMulti(keys []string) []interface{} {
 	size := len(keys)
 	var rv []interface{}
 	if rc.conn == nil {
@@ -89,7 +88,7 @@ func (rc *Cache) GetMulti(keys []string) []interface{} {
 }
 
 // Put put value to memcache.
-func (rc *Cache) Put(key string, val interface{}, timeout time.Duration) error {
+func (rc *CacheMemcache) Put(key string, val interface{}, timeout time.Duration) error {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -107,7 +106,7 @@ func (rc *Cache) Put(key string, val interface{}, timeout time.Duration) error {
 }
 
 // Delete delete value in memcache.
-func (rc *Cache) Delete(key string) error {
+func (rc *CacheMemcache) Delete(key string) error {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -117,7 +116,7 @@ func (rc *Cache) Delete(key string) error {
 }
 
 // Incr increase counter.
-func (rc *Cache) Incr(key string) error {
+func (rc *CacheMemcache) Incr(key string) error {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -128,7 +127,7 @@ func (rc *Cache) Incr(key string) error {
 }
 
 // Decr decrease counter.
-func (rc *Cache) Decr(key string) error {
+func (rc *CacheMemcache) Decr(key string) error {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -139,7 +138,7 @@ func (rc *Cache) Decr(key string) error {
 }
 
 // IsExist check value exists in memcache.
-func (rc *Cache) IsExist(key string) bool {
+func (rc *CacheMemcache) IsExist(key string) bool {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return false
@@ -153,7 +152,7 @@ func (rc *Cache) IsExist(key string) bool {
 }
 
 // ClearAll clear all cached in memcache.
-func (rc *Cache) ClearAll() error {
+func (rc *CacheMemcache) ClearAll() error {
 	if rc.conn == nil {
 		if err := rc.connectInit(); err != nil {
 			return err
@@ -165,7 +164,7 @@ func (rc *Cache) ClearAll() error {
 // StartAndGC start memcache adapter.
 // config string is like {"conn":"connection info"}.
 // if connecting error, return.
-func (rc *Cache) StartAndGC(config string) error {
+func (rc *CacheMemcache) StartAndGC(config string) error {
 	var cf map[string]string
 	json.Unmarshal([]byte(config), &cf)
 	if _, ok := cf["conn"]; !ok {
@@ -181,11 +180,11 @@ func (rc *Cache) StartAndGC(config string) error {
 }
 
 // connect to memcache and keep the connection.
-func (rc *Cache) connectInit() error {
+func (rc *CacheMemcache) connectInit() error {
 	rc.conn = memcache.New(rc.conninfo...)
 	return nil
 }
 
 func init() {
-	cache.Register("memcache", NewMemCache)
+	Register("memcache", NewMemCache)
 }

@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package mycache
 
 import (
-	"os"
 	"testing"
 	"time"
+
+	"github.com/astaxie/beego/cache"
+	"github.com/garyburd/redigo/redis"
 )
 
-func TestCache(t *testing.T) {
-	bm, err := NewCache("memory", `{"interval":20}`)
+func TestRedisCache(t *testing.T) {
+	bm, err := cache.NewCache("redis", `{"conn": "127.0.0.1:6379"}`)
 	if err != nil {
 		t.Error("init err")
 	}
@@ -33,84 +35,16 @@ func TestCache(t *testing.T) {
 		t.Error("check err")
 	}
 
-	if v := bm.Get("astaxie"); v.(int) != 1 {
-		t.Error("get err")
-	}
-
-	time.Sleep(30 * time.Second)
+	time.Sleep(11 * time.Second)
 
 	if bm.IsExist("astaxie") {
 		t.Error("check err")
 	}
-
 	if err = bm.Put("astaxie", 1, timeoutDuration); err != nil {
 		t.Error("set Error", err)
 	}
 
-	if err = bm.Incr("astaxie"); err != nil {
-		t.Error("Incr Error", err)
-	}
-
-	if v := bm.Get("astaxie"); v.(int) != 2 {
-		t.Error("get err")
-	}
-
-	if err = bm.Decr("astaxie"); err != nil {
-		t.Error("Decr Error", err)
-	}
-
-	if v := bm.Get("astaxie"); v.(int) != 1 {
-		t.Error("get err")
-	}
-	bm.Delete("astaxie")
-	if bm.IsExist("astaxie") {
-		t.Error("delete err")
-	}
-
-	//test GetMulti
-	if err = bm.Put("astaxie", "author", timeoutDuration); err != nil {
-		t.Error("set Error", err)
-	}
-	if !bm.IsExist("astaxie") {
-		t.Error("check err")
-	}
-	if v := bm.Get("astaxie"); v.(string) != "author" {
-		t.Error("get err")
-	}
-
-	if err = bm.Put("astaxie1", "author1", timeoutDuration); err != nil {
-		t.Error("set Error", err)
-	}
-	if !bm.IsExist("astaxie1") {
-		t.Error("check err")
-	}
-
-	vv := bm.GetMulti([]string{"astaxie", "astaxie1"})
-	if len(vv) != 2 {
-		t.Error("GetMulti ERROR")
-	}
-	if vv[0].(string) != "author" {
-		t.Error("GetMulti ERROR")
-	}
-	if vv[1].(string) != "author1" {
-		t.Error("GetMulti ERROR")
-	}
-}
-
-func TestFileCache(t *testing.T) {
-	bm, err := NewCache("file", `{"CachePath":"cache","FileSuffix":".bin","DirectoryLevel":2,"EmbedExpiry":0}`)
-	if err != nil {
-		t.Error("init err")
-	}
-	timeoutDuration := 10 * time.Second
-	if err = bm.Put("astaxie", 1, timeoutDuration); err != nil {
-		t.Error("set Error", err)
-	}
-	if !bm.IsExist("astaxie") {
-		t.Error("check err")
-	}
-
-	if v := bm.Get("astaxie"); v.(int) != 1 {
+	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 1 {
 		t.Error("get err")
 	}
 
@@ -118,7 +52,7 @@ func TestFileCache(t *testing.T) {
 		t.Error("Incr Error", err)
 	}
 
-	if v := bm.Get("astaxie"); v.(int) != 2 {
+	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 2 {
 		t.Error("get err")
 	}
 
@@ -126,7 +60,7 @@ func TestFileCache(t *testing.T) {
 		t.Error("Decr Error", err)
 	}
 
-	if v := bm.Get("astaxie"); v.(int) != 1 {
+	if v, _ := redis.Int(bm.Get("astaxie"), err); v != 1 {
 		t.Error("get err")
 	}
 	bm.Delete("astaxie")
@@ -141,7 +75,8 @@ func TestFileCache(t *testing.T) {
 	if !bm.IsExist("astaxie") {
 		t.Error("check err")
 	}
-	if v := bm.Get("astaxie"); v.(string) != "author" {
+
+	if v, _ := redis.String(bm.Get("astaxie"), err); v != "author" {
 		t.Error("get err")
 	}
 
@@ -157,12 +92,15 @@ func TestFileCache(t *testing.T) {
 	if len(vv) != 2 {
 		t.Error("GetMulti ERROR")
 	}
-	if vv[0].(string) != "author" {
+	if v, _ := redis.String(vv[0], nil); v != "author" {
 		t.Error("GetMulti ERROR")
 	}
-	if vv[1].(string) != "author1" {
+	if v, _ := redis.String(vv[1], nil); v != "author1" {
 		t.Error("GetMulti ERROR")
 	}
 
-	os.RemoveAll("cache")
+	// test clear all
+	if err = bm.ClearAll(); err != nil {
+		t.Error("clear all err")
+	}
 }
