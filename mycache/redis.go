@@ -20,11 +20,10 @@
 //
 // Usage:
 // import(
-//   _ "github.com/astaxie/beego/cache/redis"
-//   "github.com/astaxie/beego/cache"
+// 	"github.com/zhaochangjiang/golang-utils/mycache"
 // )
 //
-//  bm, err := cache.NewCache("redis", `{"conn":"127.0.0.1:11211"}`)
+//  cache, err := mycache.NewCache("redis", `{"password":"cae0f7fcf1","conn":"172.16.1.39:6379","dbNum":"0"}`)
 //
 //  more docs http://beego.me/docs/module/cache.md
 package mycache
@@ -32,6 +31,7 @@ package mycache
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -194,7 +194,7 @@ func (rc *RedisCache) StartAndGC(config string) error {
 	rc.conninfo = cf["conn"]
 	rc.dbNum, _ = strconv.Atoi(cf["dbNum"])
 	rc.password = cf["password"]
-
+	fmt.Println(rc)
 	rc.connectInit()
 
 	c := rc.p.Get()
