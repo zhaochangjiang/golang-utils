@@ -1,12 +1,14 @@
 package httprequest
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 
-	utils "github.com/zhaochangjiang/golang-utils/utils"
+	utils "github.com/zhaochangjiang/golang-utils/myutils"
 )
 
 //RequestParamsFormat 公共参数解析
@@ -19,15 +21,11 @@ type RequestParamsFormat struct {
 
 //Run 初始化导出服务
 func (ea *RequestParamsFormat) Run(r *http.Request) *map[string]interface{} {
-	ea.initParams(r)
-	return ea.RequestParams
-}
-
-//InitParams
-func (ea *RequestParamsFormat) initParams(r *http.Request) {
 	ea.httpRequestContent = r
 	ea.httpRequestContent.ParseForm()
-	ea.paramsOrganization()
+	ea.httpRequestContent.ParseMultipartForm(32 << 20)
+	ea.initParams()
+	return ea.RequestParams
 }
 
 func (ea *RequestParamsFormat) paramsMaps(k string, v []string) *map[string]interface{} {
@@ -98,19 +96,30 @@ func (ea *RequestParamsFormat) orgDataFormat(m int, list []string, v []string, r
 }
 
 //ParamsOrganization
-func (ea *RequestParamsFormat) paramsOrganization() {
+func (ea *RequestParamsFormat) initParams() {
+
 	var c = ea.httpRequestContent
-	if nil != c.Form {
-		for k, v := range c.Form {
+	if query := c.URL.Query(); nil != query {
+		for k, v := range query {
 			params := ea.paramsMaps(k, v)
-			*ea.GetParams = *(utils.MapMerge(ea.GetParams, params))
+			ea.GetParams = utils.MapMerge(ea.GetParams, params)
 		}
 	}
+	res, err := json.Marshal(c.PostForm)
+	if nil != err {
+		panic(err)
+	}
+	log.Println("the request params:", string(res))
 	if nil != c.PostForm {
 		for k, v := range c.PostForm {
 			params := ea.paramsMaps(k, v)
-			*ea.PostParams = *(utils.MapMerge(ea.PostParams, params))
+			ea.PostParams = utils.MapMerge(ea.PostParams, params)
 		}
+	}
+
+	postP, err := json.Marshal(*ea.PostParams)
+	if err != nil {
+		panic(postP)
 	}
 	ea.RequestParams = utils.MapMerge(ea.GetParams, ea.PostParams)
 }
