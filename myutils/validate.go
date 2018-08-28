@@ -3,7 +3,7 @@ package myutils
 import (
 	"errors"
 	"fmt"
-	"log"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -16,7 +16,10 @@ const (
 	ErrorParamsEmpty = "7110001| %s不能为空"
 
 	//ErrorParamsCategoryError 数据格式不正确
-	ErrorParamsCategoryError = "7110001| %s格式不正确"
+	ErrorParamsCategoryError = "7110002| %s格式不正确"
+
+	//ErrorParamsCategoryPregError 数据格式不正确
+	ErrorParamsCategoryPregError = "7110003| %s格式不正确"
 )
 
 //ValidateRule 校验参数的类型是
@@ -68,7 +71,9 @@ func NewValidate(params *map[string]string, rule *[]ValidateRule) *Validate {
 func (validate *Validate) Run() *[]ValidateResult {
 	for _, v := range *validate.Rules {
 		validateResult := validate.everyValidate(&v)
-		*validate.Result = append(*validate.Result, validateResult)
+		if validateResult.Code > 0 {
+			*validate.Result = append(*validate.Result, validateResult)
+		}
 	}
 	return validate.Result
 }
@@ -109,7 +114,7 @@ func (validate *Validate) getError(err string, vr *ValidateResult, rule *Validat
 func (validate *Validate) everyValidate(v *ValidateRule) ValidateResult {
 
 	validateResult := new(ValidateResult)
-
+	validateResult.Data = v.Key
 	//判断返回是否存在的结果,此处的返回结果 参数后边还会使用，顾放置在此处
 	if flagExists := validate.judgeIsSet(v); flagExists == true {
 		*validateResult = validate.ruleValidate(flagExists, v, validateResult)
@@ -117,6 +122,7 @@ func (validate *Validate) everyValidate(v *ValidateRule) ValidateResult {
 	} else { //如果值不存在，则设置默认值
 		(*validate.Params)[v.Key] = v.DefaultValue
 	}
+
 	return *validateResult
 }
 
@@ -153,7 +159,10 @@ func (validate *Validate) validatePreg(v *ValidateRule, validateResult *Validate
 
 	//如果验证正则表达式的数值不为空字符串
 	if v.Preg != "" {
-
+		match, err := regexp.MatchString(v.Preg, v.Val)
+		if match != true || err != nil {
+			validate.getError(ErrorParamsCategoryPregError, validateResult, v)
+		}
 	}
 }
 
@@ -161,7 +170,10 @@ func (validate *Validate) validatePreg(v *ValidateRule, validateResult *Validate
 func (validate *Validate) validateCategory(v *ValidateRule, validateResult *ValidateResult) {
 	var err error
 	switch v.Category {
-	case "int":
+	case "string": //字符串不验证，但是要写在此处
+		err = validate.validateLength(v)
+		break
+	case "int": //int 如果机器是64位 等于int64，如果机器是32位 等于int32
 		_, err = strconv.Atoi(v.Val)
 		break
 	case "int8":
@@ -188,19 +200,17 @@ func (validate *Validate) validateCategory(v *ValidateRule, validateResult *Vali
 	case "uint64":
 		_, err = strconv.ParseUint(v.Val, 10, 64)
 		break
-	case "bool":
-		err = validate.validateBoolean(v)
-		break
-	case "boolean":
-		err = validate.validateBoolean(v)
-		break
 	case "float64":
 		_, err = strconv.ParseFloat(v.Val, 64)
 		break
 	case "float32":
 		err = validate.validateNumberFloat(v, -2147483648, 2147483647)
 		break
-	case "string": //字符串不验证，但是要写在此处
+	case "bool":
+		err = validate.validateBoolean(v)
+		break
+	case "boolean":
+		err = validate.validateBoolean(v)
 		break
 	default:
 		break
@@ -209,6 +219,18 @@ func (validate *Validate) validateCategory(v *ValidateRule, validateResult *Vali
 		validate.getError(ErrorParamsCategoryError, validateResult, v)
 	}
 }
+
+//validateLeng 校验字符串长度
+func (validate *Validate) validateLength(v *ValidateRule) error {
+	var err error
+	stringLength := int64(StringLength(v.Val))
+	if stringLength < v.Min || stringLength > v.Max {
+		err = errors.New("length is error")
+	}
+	return err
+}
+
+//校验bool型数据
 func (validate *Validate) validateBoolean(v *ValidateRule) error {
 	var err error
 	if v.Val == "" || v.Val == "0" || v.Val == "false" || v.Val == "null" || v.Val == "nil" {
@@ -244,10 +266,9 @@ func (validate *Validate) validateNumberFloat(v *ValidateRule, min float64, max 
 	if err != nil {
 		return err
 	}
-	log.Println(numberValue)
 	//如果数值不在区间int32区间，则报错
 	if numberValue < min || numberValue > max {
-		log.Println("kkkkk")
+
 		err = errors.New("is not " + v.Category)
 	}
 	return err
