@@ -3,24 +3,44 @@ package myutils
 import (
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 const (
+
 	//ErrorParamsUNSet //参数没设置
-	ErrorParamsUNSet = "7110000|参数%s不存在"
+	ErrorParamsUNSet = 7110000
 
 	//ErrorParamsEmpty 参数不能为空
-	ErrorParamsEmpty = "7110001| %s不能为空"
+	ErrorParamsEmpty = 7110001
 
 	//ErrorParamsCategoryError 数据格式不正确
-	ErrorParamsCategoryError = "7110002| %s格式不正确"
+	ErrorParamsCategoryError = 7110002
 
 	//ErrorParamsCategoryPregError 数据格式不正确
-	ErrorParamsCategoryPregError = "7110003| %s格式不正确"
+	ErrorParamsCategoryPregError = 7110003
+
+	//ErrorParamsAreaInError 数据区间不正确
+	ErrorParamsAreaInError = 7110004
+
+	//ErrorParamsMaxAndMinAreaInError 数据区间不正确
+	ErrorParamsMaxAndMinAreaInError = 7110005
 )
+
+//ErrorMsg 错误信息描述
+var ErrorMsg = make(map[int]string)
+
+//@params language 设置语言包的类型 当前默认zh-cn
+func errorMsginit(language string) {
+	ErrorMsg[ErrorParamsEmpty] = "%s未设置"
+	ErrorMsg[ErrorParamsUNSet] = "参数%s不存在"
+	ErrorMsg[ErrorParamsCategoryError] = "%s格式不正确"
+	ErrorMsg[ErrorParamsCategoryPregError] = "%s不是%s"
+	ErrorMsg[ErrorParamsAreaInError] = "%s不在(%s-%s)"
+	ErrorMsg[ErrorParamsMaxAndMinAreaInError] = "%s的校验参数Min和Max不在(%s-%s)范围内"
+}
 
 //ValidateRule 校验参数的类型是
 type ValidateRule struct {
@@ -30,7 +50,7 @@ type ValidateRule struct {
 	Empty        bool   //验证是否为空 ，默认false，true:如果为空字符串（数字为0）不报错
 	Category     string //数据类型 当前支持 int
 	Preg         string //数据类型对应的正则表达式，空字符串不校验
-	DefaultValue string //默认值设置
+	DefaultValue string //默认值设置 默认空字符串
 	Min          int64  //最小值或字符串最小长度
 	Max          int64  //最大值或字符串最大长度
 
@@ -45,7 +65,7 @@ type Validate struct {
 	Rules    *[]ValidateRule
 	Result   *[]ValidateResult
 	Language string
-	NotValue string //参数值永远不可能是的值,此参数用于如果key不存在，给key赋默认值占位，防止程序报错用
+	NotValue string //TODO 参数值永远不可能是的值,此参数用于如果key不存在，给key赋默认值占位，防止程序报错用
 }
 
 //ValidateResult 校验结果
@@ -57,25 +77,37 @@ type ValidateResult struct {
 
 //NewValidate 参数校验初始化
 func NewValidate(params *map[string]string, rule *[]ValidateRule) *Validate {
-	//NewValidate 初始化验证参数对象
-	validate := &Validate{NotValue: ""}
-	validate.Rules = rule
-	validate.Params = params
 	tmp := make([]ValidateResult, 0)
-	validate.Result = &tmp
-	validate.Language = "zh-cn"
+	//NewValidate 初始化验证参数对象
+	validate := &Validate{NotValue: "", Rules: rule, Params: params, Language: "zh-cn", Result: &tmp}
 	return validate
 }
 
 //Run 运行
 func (validate *Validate) Run() *[]ValidateResult {
+	//初始化提示信息
+	errorMsginit(validate.Language)
 	for _, v := range *validate.Rules {
-		validateResult := validate.everyValidate(&v)
-		if validateResult.Code > 0 {
+		if v.Alias == "" {
+			v.Alias = v.Key
+		}
+		if validateResult := validate.everyValidate(&v); validateResult.Code > 0 {
 			*validate.Result = append(*validate.Result, validateResult)
 		}
 	}
 	return validate.Result
+}
+
+//SetNotValue TODO 保留功能字段
+func (validate *Validate) SetNotValue(notValue string) *Validate {
+	validate.NotValue = notValue
+	return validate
+}
+
+//SetLanguage 设置语言包
+func (validate *Validate) SetLanguage(language string) *Validate {
+	validate.Language = language
+	return validate
 }
 
 //判断是否存在
@@ -86,9 +118,10 @@ func (validate *Validate) judgeIsSet(v *ValidateRule) bool {
 		v.Val = (*validate.Params)[v.Key]
 		return true
 	}
-	v.Val = validate.NotValue
 	return false
 }
+
+//needJudgeIsSet
 func (validate *Validate) needJudgeIsSet(flagExists bool, v *ValidateRule, validateResult *ValidateResult) {
 	//如果需要判断是否存在
 	if v.Set == false && flagExists == false {
@@ -96,17 +129,11 @@ func (validate *Validate) needJudgeIsSet(flagExists bool, v *ValidateRule, valid
 	}
 }
 
-func (validate *Validate) getError(err string, vr *ValidateResult, rule *ValidateRule) {
-	v := strings.Split(err, "|")
-	var erro error
-	vr.Code, erro = strconv.Atoi(v[0])
-	if erro != nil {
-		panic(err)
-	}
-	if rule.Alias == "" {
-		vr.Message = fmt.Sprintf(v[1], rule.Key)
-	} else {
-		vr.Message = fmt.Sprintf(v[1], rule.Alias)
+func (validate *Validate) getError(errcode int, vr *ValidateResult, rule *ValidateRule) {
+
+	vr.Code = errcode
+	if vr.Message == "" {
+		vr.Message = fmt.Sprintf(ErrorMsg[errcode], rule.Alias)
 	}
 }
 
@@ -166,68 +193,131 @@ func (validate *Validate) validatePreg(v *ValidateRule, validateResult *Validate
 	}
 }
 
+//参数区间范围校验
+func (validate *Validate) paramsUnit64Area(numberVal uint64, v *ValidateRule, validateResult *ValidateResult) {
+
+	//如果传递的数据范围不在int64 和uint64最大的支持范围的交集内，报错
+	if v.Min < 0 || v.Max > 9223372036854775807 {
+		validateResult.Message = fmt.Sprintf(ErrorMsg[ErrorParamsMaxAndMinAreaInError], v.Alias, strconv.FormatInt(0, 10), strconv.FormatInt(9223372036854775807, 10))
+		validate.getError(ErrorParamsMaxAndMinAreaInError, validateResult, v)
+		return
+	}
+	//如果最下值和最小值不等，则说明一定设置了最大值或最小值，或两个都设置
+	//否则最大值等于最小值且不等于0，需要判断
+	if v.Min != v.Max || (v.Min == v.Max && v.Min != 0 && uint64(v.Min) != numberVal) {
+		if numberVal < uint64(v.Min) || numberVal > uint64(v.Max) {
+			validateResult.Message = fmt.Sprintf(ErrorMsg[ErrorParamsAreaInError], v.Alias, strconv.FormatInt(v.Min, 10), strconv.FormatInt(v.Max, 10))
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+			return
+		}
+	}
+}
+
+//参数区间范围校验
+func (validate *Validate) paramsArea(numberVal int64, v *ValidateRule, validateResult *ValidateResult) {
+
+	//如果最下值和最小值不等，则说明一定设置了最大值或最小值，或两个都设置
+	//否则最大值等于最小值且不等于0，需要判断
+	if v.Min != v.Max || (v.Min == v.Max && v.Min != 0 && v.Min != numberVal) {
+		if numberVal < v.Min || numberVal > v.Max {
+			validateResult.Message = fmt.Sprintf(ErrorMsg[ErrorParamsAreaInError], v.Alias, strconv.FormatInt(v.Min, 10), strconv.FormatInt(v.Max, 10))
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+			return
+		}
+	}
+}
+
 //验证数据类型
 func (validate *Validate) validateCategory(v *ValidateRule, validateResult *ValidateResult) {
 	var err error
 	switch v.Category {
 	case "string": //字符串不验证，但是要写在此处
-		err = validate.validateLength(v)
+		validate.validateLength(v, validateResult)
 		break
 	case "int": //int 如果机器是64位 等于int64，如果机器是32位 等于int32
-		_, err = strconv.Atoi(v.Val)
+		var numberVal int
+		numberVal, err = strconv.Atoi(v.Val)
+		if err != nil {
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+		}
+		validate.paramsArea(int64(numberVal), v, validateResult)
 		break
 	case "int8":
-		err = validate.validateNumber(v, -128, 127)
+		validate.validateNumber(v, -128, 127, validateResult)
 		break
 	case "int16":
-		err = validate.validateNumber(v, -32768, 32767)
+		validate.validateNumber(v, -32768, 32767, validateResult)
 		break
 	case "int32":
-		err = validate.validateNumber(v, -2147483648, 2147483647)
+		validate.validateNumber(v, -2147483648, 2147483647, validateResult)
 		break
 	case "int64":
-		_, err = strconv.ParseInt(v.Val, 10, 64)
+		validate.validateNumber(v, 0, 0, validateResult)
 		break
 	case "uint8":
-		err = validate.validateNumber(v, 0, 255)
+		validate.validateNumber(v, 0, 255, validateResult)
 		break
 	case "uint16":
-		err = validate.validateNumber(v, 0, 65535)
+		validate.validateNumber(v, 0, 65535, validateResult)
 		break
 	case "uint32":
-		err = validate.validateNumber(v, 0, 4294967295)
+		validate.validateNumber(v, 0, 4294967295, validateResult)
 		break
 	case "uint64":
-		_, err = strconv.ParseUint(v.Val, 10, 64)
+		var number uint64
+		number, err = strconv.ParseUint(v.Val, 10, 64)
+		if err != nil {
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+		}
+		validate.paramsUnit64Area(uint64(number), v, validateResult)
 		break
 	case "float64":
-		_, err = strconv.ParseFloat(v.Val, 64)
+		var number float64
+		number, err = strconv.ParseFloat(v.Val, 64)
+		if err != nil {
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+		}
+		validate.paramsArea(int64(number), v, validateResult)
 		break
 	case "float32":
-		err = validate.validateNumberFloat(v, -2147483648, 2147483647)
+		validate.validateNumberFloat(v, -2147483648, 2147483647, validateResult)
 		break
 	case "bool":
 		err = validate.validateBoolean(v)
+		if err != nil {
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+		}
+
 		break
 	case "boolean":
 		err = validate.validateBoolean(v)
+		if err != nil {
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+		}
 		break
 	default:
 		break
 	}
-	if err != nil {
-		validate.getError(ErrorParamsCategoryError, validateResult, v)
+
+	if validateResult.Code > 0 {
+		return
 	}
+
 }
 
 //validateLeng 校验字符串长度
-func (validate *Validate) validateLength(v *ValidateRule) error {
-	var err error
+func (validate *Validate) validateLength(v *ValidateRule, vr *ValidateResult) {
 	stringLength := int64(StringLength(v.Val))
-	if stringLength < v.Min || stringLength > v.Max {
-		err = errors.New("length is error")
+
+	//如果最下值和最小值不等，则说明一定设置了最大值或最小值，或两个都设置
+	////否则最大值等于最小值且不等于0，需要判断
+	if (v.Min != v.Max) || (v.Min != v.Max && v.Min != 0 && v.Min != stringLength) {
+		if stringLength < v.Min || stringLength > v.Max {
+			validate.getError(ErrorParamsAreaInError, vr, v)
+		}
 	}
-	return err
+	//其他条件正常过
+	return
 }
 
 //校验bool型数据
@@ -244,34 +334,51 @@ func (validate *Validate) validateBoolean(v *ValidateRule) error {
 }
 
 //校验数字
-func (validate *Validate) validateNumber(v *ValidateRule, min int64, max int64) error {
+func (validate *Validate) validateNumber(v *ValidateRule, min int64, max int64, validateResult *ValidateResult) {
 	var numberValue int64
 	var err error
 	numberValue, err = strconv.ParseInt(v.Val, 10, 64)
-	if err != nil {
-		return err
-	}
+
 	//如果数值不在区间int32区间，则报错
-	if numberValue < min || numberValue > max {
-		err = errors.New("is not " + v.Category)
+	if err != nil || (numberValue < min || numberValue > max) {
+		log.Println(err, max)
+		validateResult.Message = fmt.Sprintln(ErrorMsg[ErrorParamsCategoryPregError], v.Alias, v.Category)
+		// + v.Category
+		validate.getError(ErrorParamsCategoryError, validateResult, v)
+		return
 	}
-	return err
+	var numberVal = int64(numberValue)
+	validate.paramsArea(numberVal, v, validateResult)
 }
 
 //校验数字
-func (validate *Validate) validateNumberFloat(v *ValidateRule, min float64, max float64) error {
+func (validate *Validate) validateNumberFloat(v *ValidateRule, min float64, max float64, validateResult *ValidateResult) {
 	var numberValue float64
 	var err error
-	numberValue, err = strconv.ParseFloat(v.Val, 64)
-	if err != nil {
-		return err
-	}
-	//如果数值不在区间int32区间，则报错
-	if numberValue < min || numberValue > max {
 
-		err = errors.New("is not " + v.Category)
+	numberValue, err = strconv.ParseFloat(v.Val, 64)
+	//如果数值不在区间int32区间，则报错
+	if err != nil || (numberValue < min || numberValue > max) {
+		validateResult.Message = fmt.Sprintln(ErrorMsg[ErrorParamsCategoryPregError], v.Alias, v.Category)
+		// + v.Category
+		validate.getError(ErrorParamsCategoryError, validateResult, v)
+		return
 	}
-	return err
+
+	var numberVal = int64(numberValue)
+	//如果最下值和最小值不等，则说明一定设置了最大值或最小值，或两个都设置
+	//否则最大值等于最小值且不等于0，需要判断
+	if v.Min != v.Max || (v.Min == v.Max && v.Min != 0 && v.Min != numberVal) {
+		if numberVal < v.Min || numberVal > v.Max {
+
+			validateResult.Message = fmt.Sprintln(ErrorMsg[ErrorParamsAreaInError], v.Alias, strconv.FormatInt(v.Min, 10), strconv.FormatInt(v.Max, 10))
+			// + v.Category
+			validate.getError(ErrorParamsCategoryError, validateResult, v)
+			return
+
+		}
+	}
+
 }
 
 //验证是否为空
