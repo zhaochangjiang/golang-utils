@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
+	"io"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
@@ -83,4 +85,14 @@ func StringUTF8EncodingOf(byteContent []byte, charset Charset) []byte {
 	}
 
 	return str
+}
+
+//StringGUID 生成Guid字串
+func StringGUID() string {
+	b := make([]byte, 48)
+
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return ""
+	}
+	return StringMd5EqualPHP(base64.URLEncoding.EncodeToString(b))
 }
