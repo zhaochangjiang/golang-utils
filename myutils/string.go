@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"io"
+	"strings"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
@@ -87,6 +88,21 @@ func StringUTF8EncodingOf(byteContent []byte, charset Charset) []byte {
 	return str
 }
 
+//StringImplode 连接字符串
+func StringImplode(separator string, array *[]string) string {
+	var i = 0
+	res := ""
+	for _, v := range *array {
+		if i == 0 {
+			res += v
+		} else {
+			res += separator + v
+		}
+		i++
+	}
+	return res
+}
+
 //StringGUID 生成Guid字串
 func StringGUID() string {
 	b := make([]byte, 48)
@@ -95,4 +111,76 @@ func StringGUID() string {
 		return ""
 	}
 	return StringMd5EqualPHP(base64.URLEncoding.EncodeToString(b))
+}
+
+//StringReplace 替换字符串
+func StringReplace(source string, dividString *map[string]string) string {
+
+	sliceRes := make([]stringReplaceStruct, 0)
+	obj := newStringReplaceStruct()
+	obj.replaceString = ""
+	obj.nowString = source
+	sliceRes = append(sliceRes, *obj)
+
+	for k, v := range *dividString {
+		sliceRes = *(everyStringDivid(k, v, &sliceRes))
+	}
+	return concatString(&sliceRes)
+}
+
+//StringHtmlspecialchars  转换字符串
+func StringHtmlspecialchars(s string) string {
+	return StringReplace(s, &map[string]string{
+		"&": "&#38;", "\"": "&#34;", "<": "&#60;", ">": "&#62;", "'": "&#39;",
+	})
+}
+
+/*******************private method and struct**********************/
+func everyStringDivid(dividString, replace string, sliceResPoniter *[]stringReplaceStruct) *[]stringReplaceStruct {
+	sliceRes := make([]stringReplaceStruct, 0)
+	for _, v := range *sliceResPoniter {
+		ls := strings.Split(v.nowString, dividString)
+
+		convertStringToStringReplaceStruct(&sliceRes, &ls, replace, v.replaceString)
+	}
+
+	return &sliceRes
+}
+
+func concatString(srs *[]stringReplaceStruct) string {
+	s := ""
+	for k, v := range *srs {
+		if k == 0 {
+			s += v.nowString
+		} else {
+			s += v.replaceString + v.nowString
+		}
+	}
+	return s
+}
+
+func convertStringToStringReplaceStruct(srs *[]stringReplaceStruct, sa *[]string, replaceString, replace string) {
+
+	for k, v := range *sa {
+		obj := newStringReplaceStruct()
+		//如果是开始的时候才需要
+		if k != 0 {
+			obj.replaceString = replaceString // + replace
+		} else {
+			obj.replaceString = replace
+		}
+
+		obj.nowString = v
+		*srs = append(*srs, *obj)
+	}
+}
+
+type stringReplaceStruct struct {
+	replaceString string
+	nowString     string
+}
+
+func newStringReplaceStruct() *stringReplaceStruct {
+	obj := &stringReplaceStruct{}
+	return obj
 }
