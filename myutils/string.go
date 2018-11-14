@@ -14,6 +14,12 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
+//StringPregReplace 正则表达式替换
+func StringPregReplace(preg, replaceToString, fromString string) string {
+
+	return fromString
+}
+
 //SubString 截取字符串
 func SubString(s string, start ...int) string {
 	cap := cap(start)
