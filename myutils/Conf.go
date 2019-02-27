@@ -57,7 +57,7 @@ func (gfc *GetConf) getFileList(dir string, ext []string) *[]string {
 		if extString == "" {
 			continue
 		}
-		extString = SubString(extString, 1)
+		extString = StringSub(extString, 1)
 		if gfc.inArray(extString, &ext) == false {
 			continue
 		}
@@ -97,9 +97,9 @@ func (gfc *GetConf) Get() *map[string]string {
 	keyLen := len([]rune(gfc.suffix))
 	for k, v := range *gfc.Conf {
 		if strings.Index(k, gfc.suffix) == 0 {
-			cut := SubString(k, keyLen)
+			cut := StringSub(k, keyLen)
 			if strings.Index(cut, ".") == 0 {
-				cut = SubString(cut, 1)
+				cut = StringSub(cut, 1)
 			}
 			res[cut] = v
 		}

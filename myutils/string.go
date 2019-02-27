@@ -20,8 +20,8 @@ func StringPregReplace(preg, replaceToString, fromString string) string {
 	return fromString
 }
 
-//SubString 截取字符串
-func SubString(s string, start ...int) string {
+//StringSub 截取字符串
+func StringSub(s string, start ...int) string {
 	cap := cap(start)
 	if cap < 1 {
 		panic("the params start must be 1 or 2 parameters!")
